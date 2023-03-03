@@ -52,6 +52,7 @@
 #include <sensor_msgs/JointState.h>
 #include <nav_msgs/Odometry.h>
 #include <std_msgs/Float64.h>
+#include <control_toolbox/pid.h>
 
 #include "rm_common/ros_utilities.h"
 #include "rm_common/decision/heat_limit.h"
@@ -104,6 +105,115 @@ protected:
   uint32_t queue_size_;
   ros::Publisher pub_;
   MsgType msg_;
+};
+
+class MultiDofCommandSender
+{
+public:
+  explicit MultiDofCommandSender(ros::NodeHandle& nh)
+  {
+    XmlRpc::XmlRpcValue config{};
+    uint32_t queue_size = getParam(nh, "queue_size", 1);
+    std::vector<std::string> topics{ "topic1", "topic2", "topic3", "topic4" };
+    std::vector<std::string> config_names{ "roll_config", "pitch_config", "yaw_config",
+                                           "x_config",    "y_config",     "z_config" };
+    std::vector<std::string> pid_names{ "pid_roll", "pid_pitch", "pid_yaw", "pid_x", "pid_y", "pid_z" };
+    std::vector<std::string> topic_names{ "topic_joint1", "topic_joint2", "topic_joint3", "topic_joint4" };
+    configs_ = { roll_config_, pitch_config_, yaw_config_, x_config_, y_config_, z_config_ };
+    ROS_ASSERT(nh.getParam("translate_max_speed", translate_max_speed_) &&
+               nh.getParam("reversal_max_speed", reversal_max_speed_));
+    for (size_t i = 0; i < topics.size(); ++i)
+    {
+      ROS_ASSERT(nh.getParam(topic_names[i], topics[i]));
+      pubs_[i] = nh.advertise<std_msgs::Float64>(topics[i], queue_size);
+    }
+    for (size_t i = 0; i < config_names.size(); ++i)
+    {
+      if (nh.getParam(config_names[i], config))
+      {
+        for (size_t j = 0; j < topics.size(); ++j)
+          configs_[i].push_back(xmlRpcGetDouble(config[j]));
+      }
+      else
+      {
+        configs_[i] = { 0., 0., 0., 0. };
+      }
+    }
+    for (size_t i = 0; i < pid_names.size(); ++i)
+    {
+      if (nh.getParam(pid_names[i], config))
+        pids_[i].init(ros::NodeHandle(nh, pid_names[i]), "pid");
+      else
+        pids_[i].init(ros::NodeHandle(nh, "pid_zero"), "pid");
+    }
+  };
+  void visionReversal(double error_roll, double error_pitch, double error_yaw, double error_x, double error_y,
+                      double error_z, ros::Duration period)
+  {
+    std::vector<double> scales{
+      pids_[0].computeCommand(error_roll, period), pids_[1].computeCommand(error_pitch, period),
+      pids_[2].computeCommand(error_yaw, period),  pids_[3].computeCommand(error_x, period),
+      pids_[4].computeCommand(error_y, period),    pids_[5].computeCommand(error_z, period)
+    };
+    setGroupVel(scales[0], scales[1], scales[2], scales[3], scales[4], scales[5]);
+  }
+  void setGroupVel(double roll_scale, double pitch_scale, double yaw_scale, double x_scale, double y_scale,
+                   double z_scale)
+  {
+    /*std::vector<double> scales = { roll_scale, pitch_scale, yaw_scale, x_scale, y_scale, z_scale };
+    for (size_t i = 0; i < msgs_.size(); ++i)
+    {
+        for (size_t j = 0; j < configs_.size() / 2; ++j)
+            msgs_[i].data += reversal_max_speed_ * configs_[j][i] * scales[j];
+        for (size_t j = configs_.size() / 2; j < configs_.size(); ++j)
+            msgs_[i].data += translate_max_speed_ * configs_[j][i] * scales[j];
+    } */
+    msgs_[0].data =
+        reversal_max_speed_ *
+            ((configs_[0][0] * abs(roll_scale)) + (configs_[1][0] * pitch_scale) + (configs_[2][0] * yaw_scale)) +
+        translate_max_speed_ * ((configs_[3][0] * x_scale) + (configs_[4][0] * y_scale) + (configs_[5][0] * z_scale));
+    msgs_[1].data =
+        reversal_max_speed_ *
+            ((configs_[0][1] * abs(roll_scale)) + (configs_[1][1] * pitch_scale) + (configs_[2][1] * yaw_scale)) +
+        translate_max_speed_ * ((configs_[3][1] * x_scale) + (configs_[4][1] * y_scale) + (configs_[5][1] * z_scale));
+    msgs_[2].data =
+        reversal_max_speed_ *
+            ((configs_[0][2] * roll_scale) + (configs_[1][2] * abs(pitch_scale)) + (configs_[2][2] * yaw_scale)) +
+        translate_max_speed_ * ((configs_[3][2] * x_scale) + (configs_[4][2] * y_scale) + (configs_[5][2] * z_scale));
+    msgs_[3].data =
+        reversal_max_speed_ *
+            ((configs_[0][3] * roll_scale) + (configs_[1][3] * abs(pitch_scale)) + (configs_[2][3] * yaw_scale)) +
+        translate_max_speed_ * ((configs_[3][3] * x_scale) + (configs_[4][3] * y_scale) + (configs_[5][3] * z_scale));
+  }
+  /*void judgeLeading(double roll_scale, double pitch_scale, double yaw_scale)
+  {
+      for (size_t i = 0; i < configs_.size()/ 2; ++i) {
+          for (int j = 0; j < pubs_.size(); ++j) {
+              configs_[i][j] ;
+          }
+      }
+  }*/
+  void setZero()
+  {
+    for (size_t i = 0; i < msgs_.size(); ++i)
+      msgs_[i].data = 0;
+  }
+  void sendCommand()
+  {
+    for (size_t i = 0; i < pubs_.size(); ++i)
+      pubs_[i].publish(msgs_[i]);
+  }
+
+protected:
+  double translate_max_speed_{}, reversal_max_speed_{};
+  std::vector<std::vector<double>> configs_{ 6 };
+  std::vector<double> roll_config_, pitch_config_, yaw_config_, x_config_, y_config_, z_config_;
+
+  std::vector<ros::Publisher> pubs_{ 4 };
+  std::vector<std_msgs::Float64> msgs_{ 4 };
+
+  std::vector<control_toolbox::Pid> pids_ = std::vector<control_toolbox::Pid>(6);
+  control_toolbox::Pid pid_roll_, pid_pitch_, pid_yaw_, pid_x_, pid_y_, pid_z_;
 };
 
 template <class MsgType>

@@ -134,6 +134,7 @@ void RmRobotHW::read(const ros::Time& time, const ros::Duration& period)
       }
       if (act_data.second.halted)
       {
+        ROS_ERROR_STREAM_THROTTLE(40, "MISSING " << act_data.second.name);
         act_data.second.seq = 0;
         act_data.second.vel = 0;
         act_data.second.effort = 0;

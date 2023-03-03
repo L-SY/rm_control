@@ -64,6 +64,7 @@ add_message_files(
         DartClientCmd.msg
         ManualToReferee.msg
         RadarData.msg
+        EngineerUi.msg
 )
 
 add_action_files(
