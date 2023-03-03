@@ -21,12 +21,20 @@ RefereeBase::RefereeBase(ros::NodeHandle& nh, Base& base) : base_(base), nh_(nh)
                                                                 &RefereeBase::shootCmdDataCallback, this);
   RefereeBase::gimbal_cmd_sub_ = nh.subscribe<rm_msgs::GimbalCmd>("/controllers/gimbal_controller/command", 10,
                                                                   &RefereeBase::gimbalCmdDataCallback, this);
-  RefereeBase::card_cmd_sub_ = nh.subscribe<rm_msgs::StateCmd>("/controllers/card_controller/command", 10,
-                                                               &RefereeBase::cardCmdDataCallback, this);
   RefereeBase::engineer_cmd_sub_ =
       nh.subscribe<rm_msgs::StepQueueState>("/step_queue_state", 10, &RefereeBase::stepQueueStateDataCallback, this);
   RefereeBase::manual_data_sub_ =
       nh.subscribe<rm_msgs::ManualToReferee>("/manual_to_referee", 10, &RefereeBase::manualDataCallBack, this);
+  RefereeBase::step_ui_sub_ =
+      nh.subscribe<rm_msgs::EngineerUi>("/engineer_ui", 15, &::rm_referee::RefereeBase::stepUiDataCallback, this);
+  RefereeBase::drag_ui_sub_ =
+      nh.subscribe<rm_msgs::EngineerUi>("/engineer_ui", 15, &::rm_referee::RefereeBase::dragUiDataCallback, this);
+  RefereeBase::reversal_ui_sub_ =
+      nh.subscribe<rm_msgs::EngineerUi>("/engineer_ui", 15, &::rm_referee::RefereeBase::reversalUiDataCallback, this);
+  RefereeBase::stone_ui_sub_ =
+      nh.subscribe<rm_msgs::EngineerUi>("/engineer_ui", 15, &::rm_referee::RefereeBase::stoneUiDataCallback, this);
+  RefereeBase::joint_temperature_ui_sub_ = nh.subscribe<rm_msgs::EngineerUi>(
+      "/engineer_ui", 15, &::rm_referee::RefereeBase::jointTemperatureUiDataCallback, this);
   if (base_.robot_id_ == rm_referee::RobotId::RED_RADAR || base_.robot_id_ == rm_referee::RobotId::BLUE_RADAR)
     RefereeBase::radar_date_sub_ =
         nh.subscribe<std_msgs::Int8MultiArray>("/data", 10, &RefereeBase::radarDataCallBack, this);
@@ -43,8 +51,16 @@ RefereeBase::RefereeBase(ros::NodeHandle& nh, Base& base) : base_(base), nh_(nh)
       gimbal_trigger_change_ui_ = new GimbalTriggerChangeUi(rpc_value[i], base_);
     if (rpc_value[i]["name"] == "target")
       target_trigger_change_ui_ = new TargetTriggerChangeUi(rpc_value[i], base_);
-    if (rpc_value[i]["name"] == "polygon_1")
-      test_trigger_change_group_ui_ = new TestTriggerChangeGroupUi(rpc_value[i], base_);
+    if (rpc_value[i]["name"] == "step")
+      step_trigger_change_ui_ = new StepTriggerChangeUi(rpc_value[i], base_);
+    if (rpc_value[i]["name"] == "drag")
+      drag_trigger_change_ui_ = new DragTriggerChangeUi(rpc_value[i], base_);
+    if (rpc_value[i]["name"] == "reversal")
+      reversal_trigger_change_ui_ = new ReversalTriggerChangeUi(rpc_value[i], base_);
+    if (rpc_value[i]["name"] == "stone")
+      stone_trigger_change_ui_ = new StoneTriggerChangeUi(rpc_value[i], base_);
+    if (rpc_value[i]["name"] == "temperature")
+      joint_temperature_trigger_change_ui_ = new JointTemperatureTriggerChangeUi(rpc_value[i], base_);
   }
 
   ui_nh.getParam("time_change", rpc_value);
@@ -92,8 +108,6 @@ void RefereeBase::addUi()
     shooter_trigger_change_ui_->add();
   if (target_trigger_change_ui_)
     target_trigger_change_ui_->add();
-  if (test_trigger_change_group_ui_)
-    test_trigger_change_group_ui_->add();
   if (fixed_ui_)
     fixed_ui_->add();
   if (effort_time_change_ui_)
@@ -106,6 +120,16 @@ void RefereeBase::addUi()
     capacitor_time_change_ui_->add();
   if (lane_line_time_change_ui_)
     lane_line_time_change_ui_->add();
+  if (step_trigger_change_ui_)
+    step_trigger_change_ui_->add();
+  if (drag_trigger_change_ui_)
+    drag_trigger_change_ui_->add();
+  if (reversal_trigger_change_ui_)
+    reversal_trigger_change_ui_->add();
+  if (stone_trigger_change_ui_)
+    stone_trigger_change_ui_->add();
+  if (joint_temperature_trigger_change_ui_)
+    joint_temperature_trigger_change_ui_->add();
 }
 
 void RefereeBase::robotStatusDataCallBack(const rm_msgs::GameRobotStatus& data, const ros::Time& last_get_data_time)
@@ -161,8 +185,6 @@ void RefereeBase::dbusDataCallback(const rm_msgs::DbusData::ConstPtr& data)
     send_ui_flag_ = false;
   if (chassis_trigger_change_ui_)
     chassis_trigger_change_ui_->updateDbusData(data);
-  if (test_trigger_change_group_ui_)
-    test_trigger_change_group_ui_->updateDbusData(data);
 }
 void RefereeBase::chassisCmdDataCallback(const rm_msgs::ChassisCmd::ConstPtr& data)
 {
@@ -186,9 +208,6 @@ void RefereeBase::gimbalCmdDataCallback(const rm_msgs::GimbalCmd::ConstPtr& data
   if (gimbal_trigger_change_ui_)
     gimbal_trigger_change_ui_->updateGimbalCmdData(data);
 }
-void RefereeBase::cardCmdDataCallback(const rm_msgs::StateCmd::ConstPtr& data)
-{
-}
 void RefereeBase::stepQueueStateDataCallback(const rm_msgs::StepQueueState ::ConstPtr& data)
 {
   if (progress_time_change_ui_)
@@ -210,5 +229,39 @@ void RefereeBase::manualDataCallBack(const rm_msgs::ManualToReferee::ConstPtr& d
 void RefereeBase::radarDataCallBack(const std_msgs::Int8MultiArrayConstPtr& data)
 {
 }
-
+void RefereeBase::stepUiDataCallback(const rm_msgs::EngineerUi ::ConstPtr& data)
+{
+  if (step_trigger_change_ui_)
+  {
+    step_trigger_change_ui_->updateStepUiData(data);
+  }
+}
+void RefereeBase::dragUiDataCallback(const rm_msgs::EngineerUi ::ConstPtr& data)
+{
+  if (drag_trigger_change_ui_)
+  {
+    drag_trigger_change_ui_->updateDragUiData(data);
+  }
+}
+void RefereeBase::stoneUiDataCallback(const rm_msgs::EngineerUi ::ConstPtr& data)
+{
+  if (stone_trigger_change_ui_)
+  {
+    stone_trigger_change_ui_->updateStoneUiData(data);
+  }
+}
+void RefereeBase::reversalUiDataCallback(const rm_msgs::EngineerUi ::ConstPtr& data)
+{
+  if (reversal_trigger_change_ui_)
+  {
+    reversal_trigger_change_ui_->updateReversalUiData(data);
+  }
+}
+void RefereeBase::jointTemperatureUiDataCallback(const rm_msgs::EngineerUi ::ConstPtr& data)
+{
+  if (joint_temperature_trigger_change_ui_)
+  {
+    joint_temperature_trigger_change_ui_->updateJointTemperatureUiData(data);
+  }
+}
 }  // namespace rm_referee

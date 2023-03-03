@@ -104,60 +104,105 @@ private:
   uint8_t det_target_, shoot_frequency_, det_armor_target_, det_color_, gimbal_eject_;
 };
 
-class PolygonTriggerChangeGroupUi : public GroupUiBase
+class StepTriggerChangeUi : public TriggerChangeUi
 {
 public:
-  explicit PolygonTriggerChangeGroupUi(XmlRpc::XmlRpcValue& rpc_value, Base& base) : GroupUiBase(base)
+  explicit StepTriggerChangeUi(XmlRpc::XmlRpcValue& rpc_value, Base& base) : TriggerChangeUi(rpc_value, base, "step")
   {
-    ROS_ASSERT(rpc_value.hasMember("points"));
-    XmlRpc::XmlRpcValue config;
-
-    config["type"] = "line";
-
-    if (rpc_value["graph_config"].hasMember("color"))
-      config["color"] = rpc_value["graph_config"]["color"];
+    graph_->setContent("step_name");
+    if (base_.robot_color_ == "red")
+      graph_->setColor(rm_referee::GraphColor::CYAN);
     else
-      config["color"] = "cyan";
-    if (rpc_value["graph_config"].hasMember("width"))
-      config["width"] = rpc_value["graph_config"]["width"];
-    else
-      config["width"] = 2;
-    XmlRpc::XmlRpcValue points = rpc_value["points"];
-    config["start_position"].setSize(2);
-    config["end_position"].setSize(2);
-    for (int i = 1; i <= points.size(); i++)
-    {
-      if (i != points.size())
-      {
-        config["start_position"][0] = points[i - 1][0];
-        config["start_position"][1] = points[i - 1][1];
-        config["end_position"][0] = points[i][0];
-        config["end_position"][1] = points[i][1];
-      }
-      else
-      {
-        // Connect first and last point
-        config["start_position"][0] = points[i - 1][0];
-        config["start_position"][1] = points[i - 1][1];
-        config["end_position"][0] = points[0][0];
-        config["end_position"][1] = points[0][1];
-      }
-      graph_vector_.insert(
-          std::make_pair<std::string, Graph*>("graph_" + std::to_string(i), new Graph(config, base_, id_++)));
-    }
+      graph_->setColor(rm_referee::GraphColor::PINK);
   }
-  virtual void display();
-  virtual void updateConfig(uint8_t main_mode, bool main_flag, uint8_t sub_mode = 0, bool sub_flag = false){};
+  void updateStepUiData(const rm_msgs::EngineerUi ::ConstPtr data);
+
+private:
+  void display() override;
+  void stepUpdateConfig(std::string step_name);
+  std::string getStepName(std::string step_name);
+  std::string step_name_;
 };
 
-class TestTriggerChangeGroupUi : public PolygonTriggerChangeGroupUi
+class DragTriggerChangeUi : public TriggerChangeUi
 {
 public:
-  explicit TestTriggerChangeGroupUi(XmlRpc::XmlRpcValue& rpc_value, Base& base)
-    : PolygonTriggerChangeGroupUi(rpc_value["config"][0], base)
+  explicit DragTriggerChangeUi(XmlRpc::XmlRpcValue& rpc_value, Base& base) : TriggerChangeUi(rpc_value, base, "drag")
   {
+    graph_->setContent("drag:");
+    if (base_.robot_color_ == "red")
+      graph_->setColor(rm_referee::GraphColor::CYAN);
+    else
+      graph_->setColor(rm_referee::GraphColor::PINK);
   }
-  void updateDbusData(const rm_msgs::DbusData::ConstPtr& data);
-  void updateConfig(uint8_t main_mode, bool main_flag, uint8_t sub_mode = 0, bool sub_flag = false) override;
+  void updateDragUiData(const rm_msgs::EngineerUi ::ConstPtr data);
+
+private:
+  void display() override;
+  void dragUpdateConfig(std::string drag_state);
+  std::string getDragState(std::string drag_state);
+  std::string drag_state_;
+};
+
+class ReversalTriggerChangeUi : public TriggerChangeUi
+{
+public:
+  explicit ReversalTriggerChangeUi(XmlRpc::XmlRpcValue& rpc_value, Base& base)
+    : TriggerChangeUi(rpc_value, base, "reversal")
+  {
+    graph_->setContent("reversal:");
+    if (base_.robot_color_ == "red")
+      graph_->setColor(rm_referee::GraphColor::CYAN);
+    else
+      graph_->setColor(rm_referee::GraphColor::PINK);
+  }
+  void updateReversalUiData(const rm_msgs::EngineerUi ::ConstPtr data);
+
+private:
+  void display() override;
+  void reversalUpdateConfig(std::string reversal_state);
+  std::string getReversalState(std::string reversal_state);
+  std::string reversal_state_;
+};
+
+class StoneTriggerChangeUi : public TriggerChangeUi
+{
+public:
+  explicit StoneTriggerChangeUi(XmlRpc::XmlRpcValue& rpc_value, Base& base) : TriggerChangeUi(rpc_value, base, "stone")
+  {
+    graph_->setContent("stone:");
+    if (base_.robot_color_ == "red")
+      graph_->setColor(rm_referee::GraphColor::CYAN);
+    else
+      graph_->setColor(rm_referee::GraphColor::PINK);
+  }
+  void updateStoneUiData(const rm_msgs::EngineerUi ::ConstPtr data);
+
+private:
+  void display() override;
+  void stoneUpdateConfig(uint8_t stone_num);
+  std::string getStoneNum(uint8_t stone_num);
+  uint8_t stone_num_;
+};
+
+class JointTemperatureTriggerChangeUi : public TriggerChangeUi
+{
+public:
+  explicit JointTemperatureTriggerChangeUi(XmlRpc::XmlRpcValue& rpc_value, Base& base)
+    : TriggerChangeUi(rpc_value, base, "joint_temperature")
+  {
+    graph_->setContent("temperature");
+    if (base_.robot_color_ == "red")
+      graph_->setColor(rm_referee::GraphColor::CYAN);
+    else
+      graph_->setColor(rm_referee::GraphColor::PINK);
+  }
+  void updateJointTemperatureUiData(const rm_msgs::EngineerUi ::ConstPtr data);
+
+private:
+  void display() override;
+  void jointTemperatureUpdateConfig(std::string joint_temperature);
+  std::string getStepName(std::string step_name);
+  std::string joint_temperature_;
 };
 }  // namespace rm_referee

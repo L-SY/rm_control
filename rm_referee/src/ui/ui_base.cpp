@@ -14,14 +14,7 @@ void UiBase::add()
   graph_->sendUi(ros::Time::now());
 }
 
-void UiBase::erasure()
-{
-  graph_->setOperation(rm_referee::GraphOperation::DELETE);
-  graph_->display(true);
-  graph_->sendUi(ros::Time::now());
-}
-
-void GroupUiBase::add()
+void FixedUi ::add()
 {
   for (auto graph : graph_vector_)
   {
@@ -29,15 +22,15 @@ void GroupUiBase::add()
     graph.second->display();
     graph.second->sendUi(ros::Time::now());
   }
-}
+};
 
-void GroupUiBase::erasure()
+void FixedUi::display()
 {
   for (auto graph : graph_vector_)
   {
-    graph_->setOperation(rm_referee::GraphOperation::DELETE);
-    graph_->display(true);
-    graph_->sendUi(ros::Time::now());
+    graph.second->setOperation(rm_referee::GraphOperation::UPDATE);
+    graph.second->display();
+    graph.second->sendUi(ros::Time::now());
   }
 }
 
