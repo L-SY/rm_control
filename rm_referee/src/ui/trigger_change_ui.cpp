@@ -325,10 +325,12 @@ std::string StoneTriggerChangeUi::getStoneNum(uint8_t stone_num)
 {
   if (!stone_num)
     return "0";
-  else if (stone_num)
+  else if (stone_num == 1)
     return "1";
-  else
+  else if (stone_num == 2)
     return "2";
+  else
+    return "3";
 }
 
 void JointTemperatureTriggerChangeUi::updateJointTemperatureUiData(const rm_msgs::EngineerUi ::ConstPtr data)
