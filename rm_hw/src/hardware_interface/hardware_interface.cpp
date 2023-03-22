@@ -134,7 +134,6 @@ void RmRobotHW::read(const ros::Time& time, const ros::Duration& period)
       }
       if (act_data.second.halted)
       {
-        ROS_ERROR_STREAM_THROTTLE(40, "MISSING " << act_data.second.name);
         act_data.second.seq = 0;
         act_data.second.vel = 0;
         act_data.second.effort = 0;
@@ -146,8 +145,6 @@ void RmRobotHW::read(const ros::Time& time, const ros::Duration& period)
   // Set all cmd to zero to avoid crazy soft limit oscillation when not controller loaded
   for (auto effort_joint_handle : effort_joint_handles_)
     effort_joint_handle.setCommand(0.);
-  // Gpio read
-  gpio_manager_.readGpio();
 }
 
 void RmRobotHW::write(const ros::Time& time, const ros::Duration& period)
@@ -173,8 +170,6 @@ void RmRobotHW::write(const ros::Time& time, const ros::Duration& period)
   }
   for (auto& bus : can_buses_)
     bus->write();
-  // Gpio write
-  gpio_manager_.writeGpio();
   publishActuatorState(time);
 }
 
